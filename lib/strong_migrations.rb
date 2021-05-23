@@ -2,6 +2,7 @@
 require "active_support"
 
 # modules
+require "strong_migrations/helpers"
 require "strong_migrations/safe_methods"
 require "strong_migrations/checker"
 require "strong_migrations/database_tasks"
@@ -18,9 +19,10 @@ module StrongMigrations
   class << self
     attr_accessor :auto_analyze, :start_after, :checks, :error_messages,
       :target_postgresql_version, :target_mysql_version, :target_mariadb_version,
-      :enabled_checks, :lock_timeout, :statement_timeout, :check_down, :target_version,
+      :enabled_checks, :lock_timeout, :statement_timeout, :check_down,
       :safe_by_default
     attr_writer :lock_timeout_limit
+    attr_reader :target_version
   end
   self.auto_analyze = false
   self.start_after = 0
@@ -248,6 +250,21 @@ Use disable_ddl_transaction! or a separate migration."
   # private
   def self.developer_env?
     defined?(Rails) && (Rails.env.development? || Rails.env.test?)
+  end
+
+  def self.target_version=(value)
+    if value.is_a?(Hash)
+      unless Helpers.supports_multiple_dbs?
+        raise Error, "Multiple databases are not supported by this Rails version"
+      end
+
+      db_configs = ActiveRecord::Base.configurations.configs_for(env_name: Rails.env)
+      if db_configs.size <= 1
+        raise Error, "Multiple databases usage is not configured in database.yml"
+      end
+    end
+
+    @target_version = value
   end
 
   def self.lock_timeout_limit

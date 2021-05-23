@@ -12,3 +12,32 @@ namespace :strong_migrations do
     ActiveRecord::ConnectionAdapters::AbstractAdapter.prepend StrongMigrations::AlphabetizeColumns
   end
 end
+
+if StrongMigrations::Helpers.supports_multiple_dbs?
+  names = []
+  databases = ActiveRecord::Tasks::DatabaseTasks.setup_initial_database_yaml
+  ActiveRecord::Tasks::DatabaseTasks.for_each(databases) { |name| names << name }
+
+  if names.size > 1
+    names.each do |name|
+      task "strong_migrations:set_#{name}_database_name" do
+        ENV["STRONG_MIGRATIONS_DATABASE_NAME"] = name
+      end
+
+      ["migrate", "rollback", "migrate:up", "migrate:down"].each do |task|
+        Rake::Task["db:#{task}:#{name}"].enhance(["strong_migrations:set_#{name}_database_name"])
+      end
+    end
+
+    Rake::Task["db:migrate"].clear
+
+    namespace :db do
+      desc "Migrate the database (options: VERSION=x, VERBOSE=false, SCOPE=blog)."
+      task :migrate do
+        names.each do |name|
+          Rake::Task["db:migrate:#{name}"].invoke
+        end
+      end
+    end
+  end
+end

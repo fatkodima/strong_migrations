@@ -437,7 +437,16 @@ Then add the foreign key in separate migrations."
     end
 
     def target_version(target_version)
-      target_version ||= StrongMigrations.target_version
+      unless target_version
+        target_version =
+          if StrongMigrations.target_version.is_a?(Hash)
+            name = ENV["STRONG_MIGRATIONS_DATABASE_NAME"]
+            StrongMigrations.target_version.fetch(name.to_sym)
+          else
+            StrongMigrations.target_version
+          end
+      end
+
       version =
         if target_version && StrongMigrations.developer_env?
           target_version.to_s
@@ -448,7 +457,7 @@ Then add the foreign key in separate migrations."
     end
 
     def ar_version
-      ActiveRecord::VERSION::STRING.to_f
+      Helpers.ar_version
     end
 
     def check_lock_timeout
